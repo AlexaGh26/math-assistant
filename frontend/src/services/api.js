@@ -5,16 +5,17 @@ const WS_URL = 'ws://localhost:8000/ws';
 /**
  * Envía una pregunta al API y obtiene la respuesta
  * @param {string} question - La pregunta del usuario
+ * @param {string} [model="local"] - El modelo a utilizar para procesar la pregunta
  * @returns {Promise<Object>} - Objeto con la respuesta y posible visualización
  */
-export const processQuestion = async (question) => {
+export const processQuestion = async (question, model = "local") => {
   try {
     const response = await fetch(`${API_URL}/question`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, model }),
     });
 
     if (!response.ok) {
@@ -23,8 +24,26 @@ export const processQuestion = async (question) => {
 
     return await response.json();
   } catch (error) {
-    console.error('Error al procesar la pregunta:', error);
     throw error;
+  }
+};
+
+/**
+ * Obtiene la lista de modelos disponibles del API
+ * @returns {Promise<Array>} - Lista de modelos disponibles
+ */
+export const getAvailableModels = async () => {
+  try {
+    const response = await fetch(`${API_URL}/models`);
+    
+    if (!response.ok) {
+      throw new Error(`Error al obtener modelos: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.models || [];
+  } catch (error) {
+    return [{ name: "local", tag: "local" }];
   }
 };
 
@@ -36,21 +55,14 @@ export const setupWebSocket = () => {
   try {
     const socket = new WebSocket(WS_URL);
     
-    socket.onopen = () => {
-      console.log('Conexión WebSocket establecida');
-    };
+    socket.onopen = () => {};
     
-    socket.onerror = (error) => {
-      console.error('Error en la conexión WebSocket:', error);
-    };
+    socket.onerror = (error) => {};
     
-    socket.onclose = () => {
-      console.log('Conexión WebSocket cerrada');
-    };
+    socket.onclose = () => {};
     
     return socket;
   } catch (error) {
-    console.error('Error al configurar WebSocket:', error);
     throw error;
   }
 }; 

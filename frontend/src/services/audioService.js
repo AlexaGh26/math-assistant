@@ -1,10 +1,16 @@
-// Audio service for managing sound effects in animations
-let audioEnabled = true;
+/**
+ * Servicio para gestionar los efectos de sonido en la aplicación
+ * @module audioService
+ */
 
-// Audio cache to prevent reloading the same sounds
+// Constantes y estado
+let audioEnabled = true;
+let globalVolume = 0.5; // Valor de volumen global entre 0.0 y 1.0
 const audioCache = {};
 
-// Define sound paths
+/**
+ * Definición de rutas a archivos de sonido
+ */
 const SOUNDS = {
   POP: '/sounds/pop.mp3',
   WHOOSH: '/sounds/whoosh.mp3',
@@ -17,7 +23,8 @@ const SOUNDS = {
 };
 
 /**
- * Preload all audio files
+ * Precarga todos los archivos de audio al iniciar la aplicación
+ * para mejorar la experiencia del usuario evitando retrasos
  */
 const preloadSounds = () => {
   Object.values(SOUNDS).forEach(soundPath => {
@@ -26,9 +33,10 @@ const preloadSounds = () => {
 };
 
 /**
- * Get or create an audio object for a sound path
- * @param {string} soundPath - Path to sound file
- * @returns {HTMLAudioElement} Audio element
+ * Obtiene o crea un objeto de audio para una ruta de sonido
+ * @param {string} soundPath - Ruta al archivo de sonido
+ * @returns {HTMLAudioElement} Elemento de audio
+ * @private
  */
 const getAudio = (soundPath) => {
   if (!audioCache[soundPath]) {
@@ -40,10 +48,10 @@ const getAudio = (soundPath) => {
 };
 
 /**
- * Play a sound effect
- * @param {string} soundName - Name of sound from SOUNDS object
- * @param {number} volume - Volume level (0.0 to 1.0)
- * @param {number} playbackRate - Speed of playback (0.5 to 2.0)
+ * Reproduce un efecto de sonido
+ * @param {string} soundName - Nombre del sonido del objeto SOUNDS
+ * @param {number} volume - Nivel de volumen (0.0 a 1.0)
+ * @param {number} playbackRate - Velocidad de reproducción (0.5 a 2.0)
  */
 const playSound = (soundName, volume = 1.0, playbackRate = 1.0) => {
   if (!audioEnabled) return;
@@ -53,33 +61,39 @@ const playSound = (soundName, volume = 1.0, playbackRate = 1.0) => {
   
   const audio = getAudio(soundPath);
   
-  // Clone the audio to allow multiple overlapping instances
   const audioClone = audio.cloneNode();
-  audioClone.volume = volume;
+  audioClone.volume = volume * globalVolume; // Ajustar volumen según volumen global
   audioClone.playbackRate = playbackRate;
   
-  audioClone.play().catch(err => {
-    console.warn('Error playing sound:', err);
-  });
+  audioClone.play().catch(err => {});
 };
 
 /**
- * Enable or disable audio
- * @param {boolean} enabled - Whether audio should be enabled
+ * Activa o desactiva el audio en toda la aplicación
+ * @param {boolean} enabled - Si el audio debe estar habilitado
  */
 const setAudioEnabled = (enabled) => {
   audioEnabled = enabled;
 };
 
 /**
- * Check if audio is currently enabled
- * @returns {boolean} - Whether audio is enabled
+ * Establece el nivel de volumen global para todos los sonidos
+ * @param {number} volume - Nivel de volumen entre 0.0 y 1.0
+ */
+const setGlobalVolume = (volume) => {
+  globalVolume = Math.max(0, Math.min(1, volume)); // Asegurar que está entre 0 y 1
+};
+
+/**
+ * Verifica si el audio está actualmente habilitado
+ * @returns {boolean} - Si el audio está habilitado
  */
 const isAudioEnabled = () => audioEnabled;
 
 export {
   playSound,
   setAudioEnabled,
+  setGlobalVolume,
   isAudioEnabled,
   preloadSounds,
   SOUNDS

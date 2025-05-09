@@ -17,14 +17,12 @@ const ChatArea = () => {
   const [isBackendConnected, setIsBackendConnected] = useState(true);
   const messagesEndRef = useRef(null);
 
-  // Obtener modelos disponibles al cargar
   useEffect(() => {
     const loadModels = async () => {
       try {
         const availableModels = await getAvailableModels();
         if (availableModels && availableModels.length > 0) {
           setModels(availableModels);
-          // Seleccionar modelo local por defecto si está disponible, o el primero
           const defaultModel = availableModels.find(m => m.name === 'local') || availableModels[0];
           setSelectedModel(defaultModel.name);
           setIsBackendConnected(true);
@@ -38,7 +36,6 @@ const ChatArea = () => {
     loadModels();
   }, []);
 
-  // Auto-scroll al último mensaje
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -56,10 +53,8 @@ const ChatArea = () => {
     e.preventDefault();
     if (!inputText.trim() || isLoading) return;
 
-    // Detener cualquier reproducción de voz activa
     stopSpeaking();
 
-    // Agregar mensaje del usuario
     setMessages(prev => [...prev, { 
       sender: 'user', 
       text: inputText 

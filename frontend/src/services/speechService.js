@@ -3,7 +3,7 @@
  * @returns {boolean} - true si está disponible, false si no
  */
 export const isSpeechSupported = () => {
-  return 'speechSynthesis' in window;
+  return 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
 };
 
 /**
@@ -13,43 +13,75 @@ export const isSpeechSupported = () => {
  */
 export const speak = (text) => {
   if (!isSpeechSupported()) {
-    console.error('Web Speech API no disponible en este navegador');
+    console.error('Web Speech API no está soportada en este navegador');
     return false;
   }
   
-  // Detener cualquier habla anterior
-  window.speechSynthesis.cancel();
-  
-  // Preprocesar el texto para evitar problemas con "undefined"
-  const processedText = text.replace(/undefined/g, '');
-  
-  const utterance = new SpeechSynthesisUtterance(processedText);
-  
-  // Configurar voz y propiedades para una voz infantil
-  utterance.lang = 'es-ES';  // Español
-  utterance.rate = 0.9;     // Velocidad moderada para mejor comprensión
-  utterance.pitch = 1.1;     // Tono más alto para simular voz infantil
-  utterance.volume = 1.0;    // Volumen normal
-  
-  // No usamos addPauses para evitar problemas con SSML
-  // Las pausas naturales ocurrirán con puntuación normal
-  
-  // Obtener voces disponibles
-  let voices = window.speechSynthesis.getVoices();
-  
-  // Si las voces aún no están disponibles, esperar el evento voiceschanged
-  if (voices.length === 0) {
-    window.speechSynthesis.addEventListener('voiceschanged', () => {
-      voices = window.speechSynthesis.getVoices();
+  try {
+    // Detener cualquier voz que esté reproduciéndose
+    window.speechSynthesis.cancel();
+    
+    // Sanitizar el texto
+    const processedText = text ? text.replace(/undefined/g, '') : ''; 
+    if (!processedText) {
+      console.warn('Texto vacío, no hay nada que decir');
+      return false;
+    }
+    
+    // Crear el objeto utterance
+    const utterance = new SpeechSynthesisUtterance(processedText);
+    
+    // Configurar parámetros básicos
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.5; 
+    utterance.pitch = 2;
+    utterance.volume = 1.0;
+    
+    utterance.onstart = () => console.log('La voz comenzó a hablar');
+    utterance.onend = () => console.log('La voz terminó de hablar');
+    utterance.onerror = (event) => console.error('Error en la síntesis de voz:', event);
+    
+    let voices = window.speechSynthesis.getVoices();
+    
+    if (voices.length === 0) {
+      window.speechSynthesis.cancel();
+      
+      window.speechSynthesis.addEventListener('voiceschanged', () => {
+        voices = window.speechSynthesis.getVoices();
+        
+        if (voices.length > 0) {
+          setChildFriendlyVoice(utterance, voices);
+          window.speechSynthesis.speak(utterance);
+        } else {
+          console.warn('No se encontraron voces disponibles después del evento voiceschanged');
+          window.speechSynthesis.speak(utterance); // Intentar hablar con la voz predeterminada
+        }
+      }, { once: true });
+    } else {
       setChildFriendlyVoice(utterance, voices);
       window.speechSynthesis.speak(utterance);
-    }, { once: true });
-  } else {
-    setChildFriendlyVoice(utterance, voices);
-    window.speechSynthesis.speak(utterance);
+    }
+    
+    // Solución para el bug de Chrome donde el audio se detiene después de ~15 segundos
+    const resumeSpeechEvery5Seconds = setInterval(() => {
+      if (!window.speechSynthesis.speaking) {
+        clearInterval(resumeSpeechEvery5Seconds);
+        return;
+      }
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    }, 5000);
+    
+    // Limpiar el intervalo cuando se completa la reproducción
+    utterance.onend = () => {
+      clearInterval(resumeSpeechEvery5Seconds);
+    };
+    
+    return true;
+  } catch (error) {
+    console.error('Error al iniciar la síntesis de voz:', error);
+    return false;
   }
-  
-  return true;
 };
 
 /**
@@ -58,7 +90,6 @@ export const speak = (text) => {
  */
 export const stopSpeaking = () => {
   if (!isSpeechSupported()) {
-    console.error('Web Speech API no disponible en este navegador');
     return false;
   }
   
@@ -66,7 +97,7 @@ export const stopSpeaking = () => {
     window.speechSynthesis.cancel();
     return true;
   } catch (error) {
-    console.error('Error al detener la reproducción de voz:', error);
+    console.error('Error al detener la síntesis de voz:', error);
     return false;
   }
 };
@@ -80,34 +111,46 @@ export const isSpeaking = () => {
     return false;
   }
   
-  return window.speechSynthesis.speaking;
+  try {
+    return window.speechSynthesis.speaking;
+  } catch (error) {
+    console.error('Error al verificar si la voz está hablando:', error);
+    return false;
+  }
 };
 
 /**
  * Intenta encontrar y configurar una voz amigable para niños
  * @param {SpeechSynthesisUtterance} utterance - Objeto utterance a modificar
  * @param {Array} voices - Lista de voces disponibles
+ * @private
  */
 const setChildFriendlyVoice = (utterance, voices) => {
-  // Voces preferidas para niños (en orden de preferencia)
-  const preferredVoices = [
-    // Intentar encontrar voces específicas con nombres conocidos para voces infantiles
-    voices.find(voice => voice.name.includes('Infantil') && voice.lang.startsWith('es')),
-    voices.find(voice => voice.name.includes('Kids') && voice.lang.startsWith('es')),
-    voices.find(voice => voice.name.includes('Child') && voice.lang.startsWith('es')),
-    // Buscar una voz femenina en español (suelen ser más claras para niños)
-    voices.find(voice => voice.lang.startsWith('es') && voice.name.includes('female')),
-    // Como último recurso, cualquier voz en español
-    voices.find(voice => voice.lang.startsWith('es')),
-    // Si nada funciona, simplemente usar la primera voz disponible
-    voices[0]
-  ];
+  if (!voices || voices.length === 0) {
+    console.warn('No hay voces disponibles para seleccionar');
+    return;
+  }
   
-  // Usar la primera voz disponible en el orden de preferencia
-  const selectedVoice = preferredVoices.find(voice => voice !== undefined);
+  let selectedVoice = null;
+  
+  selectedVoice = voices.find(voice => 
+    voice.lang.startsWith('es') && 
+    (voice.name.toLowerCase().includes('Infantil') || 
+     voice.name.toLowerCase().includes('niño') || 
+     voice.name.toLowerCase().includes('kids') || 
+     voice.name.toLowerCase().includes('child'))
+  );
+  
+  if (!selectedVoice) {
+    selectedVoice = voices.find(voice => voice.lang.startsWith('es'));
+  }
+  if (!selectedVoice && voices.length > 0) {
+    selectedVoice = voices[0];
+  }
   
   if (selectedVoice) {
     utterance.voice = selectedVoice;
-    console.log('Usando voz:', selectedVoice.name);
+  } else {
+    console.warn('No se pudo seleccionar ninguna voz');
   }
 }; 

@@ -1,44 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import OperationButtons from './components/OperationButtons/index';
-import NumberSelector from './components/NumberSelector/index';
-import OperationResult from './components/OperationResult/index';
+import LearningSteps from './components/LearningSteps/index';
 import ChatArea from './components/ChatArea/index';
 import './App.css';
 import { speak } from './services/speechService';
+import { setGlobalVolume } from './services/audioService';
 
+/**
+ * Componente principal de la aplicación Mateo Matemático
+ * Administra el estado y la lógica de la interfaz de usuario para el asistente de matemáticas
+ * @returns {JSX.Element} Componente App
+ */
 function App() {
   const [selectedOperation, setSelectedOperation] = useState(null);
-  const [operationResult, setOperationResult] = useState(null);
   const [showChat, setShowChat] = useState(false);
+  const [volume, setVolume] = useState(0.5);
 
-  // Función para manejar la selección de operación
+  /**
+   * Maneja la selección de una operación matemática
+   * @param {Object} operation - Operación seleccionada con propiedades como name, symbol, etc.
+   */
   const handleSelectOperation = (operation) => {
-    console.log('handleSelectOperation recibió:', operation);
-    
     if (!operation || typeof operation !== 'object' || !operation.name) {
-      console.error('Error: Operación inválida recibida', operation);
       return;
     }
     
     setSelectedOperation(operation);
-    setOperationResult(null); // Resetear resultado al cambiar de operación
     
-    // Proporcionar retroalimentación por voz con verificación adicional
     const operationName = operation.name || 'operación';
-    speak(`Harás una ${operationName}. Ahora elige los números para realizar la operación.`);
+    speak(`Has seleccionado ${operationName}. Vamos a aprender y practicar juntos.`);
   };
 
-  // Función para manejar el cálculo
-  const handleCalculate = (result) => {
-    setOperationResult(result);
-  };
-
-  // Función para cambiar entre el modo práctica y el chat
+  /**
+   * Alterna entre el modo práctica y el modo chat
+   */
   const toggleMode = () => {
     setShowChat(!showChat);
     setSelectedOperation(null);
-    setOperationResult(null);
   };
+
+  /**
+   * Actualiza el volumen global cuando cambia el control
+   */
+  const handleVolumeChange = (e) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+    setGlobalVolume(newVolume);
+  };
+
+  // Establecer el volumen global al iniciar
+  useEffect(() => {
+    setGlobalVolume(volume);
+  }, []);
 
   return (
     <div className="app">
@@ -47,38 +60,52 @@ function App() {
           <span className="logo-icon">🧮</span>
           <h1 className="app-title">Mateo Matemático</h1>
         </div>
-        <button className="mode-toggle" onClick={toggleMode}>
-          {showChat ? '🔢 Modo Práctica' : '💬 Modo Chat'}
-        </button>
+        <div className="controls-container">
+          <div className="volume-control">
+            <label htmlFor="volume-slider">🔊</label>
+            <input
+              type="range"
+              id="volume-slider"
+              min="0"
+              max="1"
+              step="0.1"
+              value={volume}
+              onChange={handleVolumeChange}
+            />
+          </div>
+          <button className="mode-toggle" onClick={toggleMode}>
+            {showChat ? '🔢 Modo Práctica' : '💬 Modo Chat'}
+          </button>
+        </div>
       </header>
 
       <main className="app-main">
         {showChat ? (
-          // Sección de Chat
           <div className="chat-section">
             <ChatArea />
           </div>
         ) : (
-          // Sección de Práctica con Operaciones
           <div className="practice-section">
             <div className="operation-section-container">
-              <OperationButtons onSelectOperation={handleSelectOperation} />
-              
-              {selectedOperation && (
-                <div className="operation-area">
-                  <NumberSelector 
-                    operation={selectedOperation} 
-                    onCalculate={handleCalculate} 
-                  />
+              {!selectedOperation ? (
+                <OperationButtons onSelectOperation={handleSelectOperation} />
+              ) : (
+                <div className="learning-area">
+                  <div className="learning-header">
+                    <h2 className="selected-operation-title" style={{ color: selectedOperation.color }}>
+                      Aprendiendo: <span>{selectedOperation.name}</span>
+                    </h2>
+                    <button 
+                      className="change-operation-button"
+                      onClick={() => setSelectedOperation(null)}
+                    >
+                      Cambiar operación
+                    </button>
+                  </div>
+                  <LearningSteps operation={selectedOperation} />
                 </div>
               )}
             </div>
-            
-            {operationResult && (
-              <div className="result-area">
-                <OperationResult result={operationResult} />
-              </div>
-            )}
           </div>
         )}
       </main>

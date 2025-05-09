@@ -10,7 +10,6 @@ const OperationButtons = ({ onSelectOperation }) => {
   ];
 
   const handleOperationSelect = (op) => {
-    console.log('Operación seleccionada:', op);
     onSelectOperation(op);
   };
 

@@ -4,55 +4,44 @@ import { playSound, setAudioEnabled, isAudioEnabled, SOUNDS } from '../../servic
 import './styles.css';
 
 const OperationResult = ({ result }) => {
-  console.log('OperationResult recibió result:', result);
-
   const canvasRef = useRef(null);
-  // Validar que result contiene todos los datos necesarios
+  
   if (!result || !result.operation) {
-    console.error('Error: result o result.operation es undefined', result);
     return <div className="error-message">Error: No se pudo cargar el resultado de la operación</div>;
   }
   
   const { firstNumber, secondNumber, operation, result: computedResult, explanation } = result;
-  
-  console.log('OperationResult desestructuró operation:', operation);
 
   const [animationFrame, setAnimationFrame] = useState(0);
   const [isAnimating, setIsAnimating] = useState(true);
   const [isSpeakingNow, setIsSpeakingNow] = useState(false);
-  const [hasPlayed, setHasPlayed] = useState(false); // Track if animation has played once
-  const [audioEnabled, setAudioEnabledState] = useState(true); // Track audio state
+  const [hasPlayed, setHasPlayed] = useState(false);
+  const [audioEnabled, setAudioEnabledState] = useState(true);
   const animationRef = useRef(null);
-  const animationStartTimeRef = useRef(null); // Track animation start time for better timing
-  const prevResultRef = useRef(null); // Para almacenar el resultado anterior
-  const soundTimeoutsRef = useRef([]); // Track sound timeouts for cleanup
+  const animationStartTimeRef = useRef(null);
+  const prevResultRef = useRef(null);
+  const soundTimeoutsRef = useRef([]);
 
-  // Comprobar periódicamente si la síntesis de voz está activa
   useEffect(() => {
     const checkSpeaking = () => {
       setIsSpeakingNow(isSpeaking());
     };
     
-    // Comprobar inicialmente
     checkSpeaking();
     
-    // Configurar intervalo para comprobar el estado de la voz
     const interval = setInterval(checkSpeaking, 300);
     
     return () => clearInterval(interval);
   }, []);
 
-  // Initialize audio state
   useEffect(() => {
     setAudioEnabledState(isAudioEnabled());
   }, []);
 
-  // Update global audio state when local state changes
   useEffect(() => {
     setAudioEnabled(audioEnabled);
   }, [audioEnabled]);
 
-  // Cleanup sound timeouts on unmount
   useEffect(() => {
     return () => {
       soundTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
@@ -60,20 +49,19 @@ const OperationResult = ({ result }) => {
     };
   }, []);
 
-  // Reproducir explicación por voz cuando se obtiene un resultado
   useEffect(() => {
     if (explanation) {
-      speak(explanation);
-      setIsSpeakingNow(true);
+      setTimeout(() => {
+        speak(explanation);
+        setIsSpeakingNow(true);
+      }, 100);
     }
   }, [explanation]);
 
-  // Helper function to schedule sounds with animation
   const scheduleSound = (soundName, delayMs, volume = 1.0, rate = 1.0) => {
     if (!audioEnabled) return;
     
     const timeout = setTimeout(() => {
-      // Use normal volume for all sounds including POP sounds
       playSound(soundName, volume, rate);
     }, delayMs);
     
@@ -81,52 +69,40 @@ const OperationResult = ({ result }) => {
     return timeout;
   };
 
-  // Función para reiniciar la animación
   const restartAnimation = () => {
     if (isAnimating) return;
     
-    // Limpiar cualquier animación anterior
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
     
-    // Clear any scheduled sounds
     soundTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
     soundTimeoutsRef.current = [];
     
-    // Reiniciar el estado de la animación
     setAnimationFrame(0);
     setIsAnimating(true);
-    setHasPlayed(false); // Reset hasPlayed a false para permitir la nueva animación
+    setHasPlayed(false);
     
-    // Play restart sound
     playSound('WHOOSH', 0.7, 1.2);
     
-    // Reiniciar el canvas
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     
-    // Resetear la referencia de tiempo de inicio
     animationStartTimeRef.current = null;
   };
 
-  // Function to toggle audio
   const toggleAudio = () => {
     setAudioEnabledState(!audioEnabled);
   };
 
-  // Detectar cambios en el resultado y reiniciar la animación
   useEffect(() => {
-    // Asegurarse de que operation existe y tiene id
     if (!operation || !operation.id) {
-      console.error('Error: operation undefined o sin id en useEffect de OperationResult');
       return;
     }
     
-    // Crear un objeto que represente la operación actual para comparación
     const currentResult = {
       firstNumber,
       secondNumber,
@@ -134,176 +110,131 @@ const OperationResult = ({ result }) => {
       computedResult
     };
     
-    console.log('En useEffect, currentResult:', currentResult);
-    
-    // Verificar si este es un nuevo resultado comparando con el anterior
     if (prevResultRef.current) {
       const prevResult = prevResultRef.current;
       
-      // Si alguno de los valores ha cambiado, reiniciar la animación
       if (
         prevResult.firstNumber !== currentResult.firstNumber ||
         prevResult.secondNumber !== currentResult.secondNumber ||
         prevResult.operationId !== currentResult.operationId ||
         prevResult.computedResult !== currentResult.computedResult
       ) {
-        // Reiniciar estados para una nueva animación
         setIsAnimating(true);
         setHasPlayed(false);
         
-        // Limpiar animación previa si existe
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
           animationRef.current = null;
         }
         
-        // Clear any scheduled sounds
         soundTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
         soundTimeoutsRef.current = [];
         
-        // Play change sound
         playSound('WHOOSH', 0.6, 1.2);
         
-        // Resetear tiempo de inicio
         animationStartTimeRef.current = null;
       }
     }
     
-    // Actualizar la referencia al resultado actual
     prevResultRef.current = currentResult;
   }, [firstNumber, secondNumber, operation?.id, computedResult, audioEnabled]);
 
-  // Iniciar la animación cuando se obtiene un resultado
   useEffect(() => {
-    // Si ya jugó la animación y no estamos reiniciando, no reproducir de nuevo
     if (hasPlayed && !isAnimating) return;
     
     if (!canvasRef.current) return;
     
-    // Limpiar cualquier animación anterior
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
     
-    // Clear any scheduled sounds
     soundTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
     soundTimeoutsRef.current = [];
     
-    // Marcar que la animación se ha reproducido
     setHasPlayed(true);
     
-    // Schedule initial sound
     if (audioEnabled) {
       playSound('WHOOSH', 0.6, 1.0);
     }
     
-    // Aseguramos que el canvas tenga las dimensiones correctas desde el inicio
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Pre-renderizar el primer frame con progreso 0 para evitar titileos
-    ctx.font = 'bold 20px Arial';
-    ctx.textAlign = 'center';
-    
-    // Determinar qué animación renderizar según la operación
-    const renderAnimation = (progress) => {
-      if (!operation || !operation.id) {
-        console.error('Error: operation undefined o sin id en renderAnimation');
-        return;
-      }
-      
-      console.log('renderAnimation con operation.id:', operation.id);
-      
-      switch (operation.id) {
-        case 'suma':
-          animateAddition(ctx, firstNumber, secondNumber, computedResult, canvas.width, canvas.height, operation.color, progress);
-          break;
-        case 'resta':
-          animateSubtraction(ctx, firstNumber, secondNumber, computedResult, canvas.width, canvas.height, operation.color, progress);
-          break;
-        case 'multiplicacion':
-          animateMultiplication(ctx, firstNumber, secondNumber, computedResult, canvas.width, canvas.height, operation.color, progress);
-          break;
-        case 'division':
-          animateDivision(ctx, firstNumber, secondNumber, computedResult, canvas.width, canvas.height, operation.color, progress);
-          break;
-        default:
-          console.error('Tipo de operación desconocido:', operation.id);
-          break;
-      }
-    };
-    
-    // Schedule success sound at the end of animation
-    scheduleSound('SUCCESS', 3000, 0.7);
-    
-    // Renderizar el primer frame con progreso 0
     renderAnimation(0);
+    startAnimation();
     
-    // Comenzar la animación con un pequeño retraso para estabilizar la visualización
-    setTimeout(() => {
-      // Comenzar la animación
-      const startAnimation = () => {
-        let frame = 0;
-        
-        const animate = (timestamp) => {
-          // Inicializar tiempo de inicio si es la primera vez
-          if (!animationStartTimeRef.current) {
-            animationStartTimeRef.current = timestamp;
-          }
-          
-          // Calcular progreso basado en el tiempo transcurrido para animación más suave
-          const elapsed = timestamp - animationStartTimeRef.current;
-          const progress = Math.min(elapsed / 3000, 1); // 3 segundos para la animación completa
-          
-          if (!canvasRef.current) return;
-          
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          
-          // Usar la función definida arriba para renderizar el frame actual
-          renderAnimation(progress);
-          
-          setAnimationFrame(frame);
-          
-          frame++;
-          if (progress < 1) {
-            animationRef.current = requestAnimationFrame(animate);
-          } else {
-            setIsAnimating(false);
-          }
-        };
-        
-        animationRef.current = requestAnimationFrame(animate);
-      };
-      
-      startAnimation();
-    }, 50); // Un pequeño retraso de 50ms para estabilizar
+  }, [isAnimating, firstNumber, secondNumber, operation?.id, computedResult, audioEnabled]);
+  
+  const renderAnimation = (progress) => {
+    if (!operation || !operation.id) {
+      return;
+    }
     
-    // Limpiar la animación cuando el componente se desmonte
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-      
-      // Clear any scheduled sounds
-      soundTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
-      soundTimeoutsRef.current = [];
-    };
-  }, [firstNumber, secondNumber, operation, computedResult, isAnimating, hasPlayed, audioEnabled]);
-
-  // Manejador para el botón de hablar
-  const handleSpeak = () => {
-    speak(explanation);
-    setIsSpeakingNow(true);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    
+    // Limpiar canvas
+    ctx.clearRect(0, 0, width, height);
+    
+    // Ejecutar la animación según el tipo de operación
+    switch(operation.id) {
+      case 'suma':
+        animateAddition(ctx, firstNumber, secondNumber, computedResult, width, height, operation.color, progress);
+        break;
+      case 'resta':
+        animateSubtraction(ctx, firstNumber, secondNumber, computedResult, width, height, operation.color, progress);
+        break;
+      case 'multiplicacion':
+        animateMultiplication(ctx, firstNumber, secondNumber, computedResult, width, height, operation.color, progress);
+        break;
+      case 'division':
+        animateDivision(ctx, firstNumber, secondNumber, computedResult, width, height, operation.color, progress);
+        break;
+      default:
+        // Si no sabemos qué operación es, no hacemos nada
+        break;
+    }
   };
   
-  // Manejador para el botón de detener voz
-  const handleStopSpeaking = () => {
-    stopSpeaking();
-    setIsSpeakingNow(false);
+  const startAnimation = () => {
+    if (!isAnimating) return;
+    
+    const animate = (timestamp) => {
+      // Si es el primer frame, guardar el timestamp
+      if (!animationStartTimeRef.current) {
+        animationStartTimeRef.current = timestamp;
+      }
+      
+      // Calcular el progreso (de 0 a 1) basado en el tiempo transcurrido
+      const elapsed = timestamp - animationStartTimeRef.current;
+      const duration = 3000; // 3 segundos para la animación completa
+      let progress = Math.min(elapsed / duration, 1);
+      
+      // Renderizar la animación según el progreso
+      renderAnimation(progress);
+      
+      // Actualizar el frame actual
+      setAnimationFrame(prev => prev + 1);
+      
+      // Si la animación no ha terminado, solicitar el siguiente frame
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        // Al terminar la animación
+        setIsAnimating(false);
+        animationRef.current = null;
+        // Reproducir sonido de finalización
+        if (audioEnabled) {
+          playSound('SUCCESS', 0.4, 0.9);
+        }
+      }
+    };
+    
+    // Iniciar la animación
+    animationRef.current = requestAnimationFrame(animate);
   };
-
-  // Función para animar suma
+  
   const animateAddition = (ctx, num1, num2, result, width, height, color, progress) => {
     // Definir constantes para posicionamiento - mantener estas constantes fuera de cualquier condicional
     const circleRadius = 15;
@@ -313,20 +244,15 @@ const OperationResult = ({ result }) => {
     const secondRowY = 130;
     const resultRowY = 250; // Aumentado para dar más espacio desde la línea
     
-    // Calcular las dimensiones máximas necesarias (incluso para elementos que aún no son visibles)
-    // Esto ayuda a evitar reajustes de espacio durante la animación
     const maxRowsFirstNumber = Math.ceil(num1 / 10);
     const maxRowsSecondNumber = Math.ceil(num2 / 10);
     const maxRowsResult = Math.ceil(result / 10);
     
-    // Calculate current animation section for sound effects
     const isFirstSection = progress < 0.2;
     const isSecondSection = progress >= 0.2 && progress < 0.6;
     const isLineSection = progress >= 0.6 && progress < 0.8;
     const isResultSection = progress >= 0.8;
     
-    // Sound effects for different sections
-    // Only trigger once per section change
     if (isSecondSection && progress < 0.21 && audioEnabled) {
       playSound('POP', 0.6, 1.2);
     }
@@ -386,7 +312,6 @@ const OperationResult = ({ result }) => {
     ctx.font = 'bold 30px Arial';
     ctx.fillText('+', width / 2, 100);
     
-    // Dibujar segundo número con animación de entrada
     const secondNumberProgress = Math.max(0, Math.min(1, (progress - 0.2) * 2));
     ctx.fillStyle = '#2196F3';
     
@@ -395,17 +320,14 @@ const OperationResult = ({ result }) => {
         const x = startX + (i % 10) * spacing;
         const y = secondRowY + Math.floor(i / 10) * spacing;
         
-        // Añadir efecto de aparición
         const scale = secondNumberProgress < 1 ? 
                      Math.min(1, 3 * (secondNumberProgress - i / num2)) : 1;
         
         if (scale > 0) {
-          // Dibujar la bolita
           ctx.beginPath();
           ctx.arc(x, y, circleRadius * scale, 0, 2 * Math.PI);
           ctx.fill();
           
-          // Añadir número si la bolita ya está casi completa
           if (scale > 0.7) {
             ctx.fillStyle = '#000';
             ctx.font = 'bold 14px Arial';
@@ -495,7 +417,6 @@ const OperationResult = ({ result }) => {
     }
   };
 
-  // Función para animar resta
   const animateSubtraction = (ctx, num1, num2, result, width, height, color, progress) => {
     // Definir constantes para posicionamiento
     const circleRadius = 15;
@@ -516,24 +437,24 @@ const OperationResult = ({ result }) => {
     
     // Sound effects for animation phases
     if (markingPhase && progress < 0.31 && audioEnabled) {
-      playSound('WHOOSH', 0.5, 1.1);
+      playSound('WHOOSH', 0.4, 1.1);
     }
     
     if (removingPhase && progress < 0.61 && audioEnabled) {
-      playSound('SUBTRACT', 0.7, 1.0);
+      playSound('SUBTRACT', 0.4, 1.0);
       
       // If result is negative, add a special sound effect
       if (isNegative) {
-        scheduleSound('NEGATIVE', 300, 0.6, 0.9);
+        scheduleSound('NEGATIVE', 300, 0.4, 0.9);
       }
     }
     
     if (resultPhase && progress < 0.81 && audioEnabled) {
       // Different sound for positive vs negative results
       if (isNegative) {
-        playSound('NEGATIVE', 0.7, 1.0);
+        playSound('NEGATIVE', 0.4, 1.0);
       } else {
-        playSound('COUNT', 0.7, 1.0);
+        playSound('COUNT', 0.5, 1.0);
       }
     }
     
@@ -572,7 +493,7 @@ const OperationResult = ({ result }) => {
         // Play sound when X appears (with small delay between each)
         if (xProgress > 0 && xProgress < 0.1 && audioEnabled) {
           const delay = (i - (num1 - num2)) * 50;
-          scheduleSound('SUBTRACT', delay, 0.3, 1.5);
+          scheduleSound('SUBTRACT', delay, 0.2, 1.5);
         }
         
         ctx.strokeStyle = '#FF5722';
@@ -644,22 +565,18 @@ const OperationResult = ({ result }) => {
     if (progress > 0.8) {
       const resultProgress = Math.min(1, (progress - 0.8) * 5);
       
-      // Mostrar el total del resultado arriba de las bolitas
       ctx.fillStyle = isNegative ? '#DC0000' : '#333';
       ctx.font = 'bold 18px Arial';
       ctx.textAlign = 'left';
       ctx.fillText(`Resultado: ${result}`, startX, resultRowY - 30);
         
-      // Dibujar las bolitas del resultado (positivo o negativo)
       for (let i = 0; i < absResult; i++) {
         if (i / absResult <= resultProgress) {
           const x = startX + (i % 10) * spacing;
           const y = resultRowY + Math.floor(i / 10) * spacing;
           
-          // Efecto de deslizamiento suave
           const slideY = y - (1 - resultProgress) * 20;
           
-          // Play pop sound for each dot that appears - no limit to every 5th dot
           if (i / absResult <= resultProgress && 
               i / absResult > resultProgress - 0.05 && 
               audioEnabled) {
@@ -667,34 +584,28 @@ const OperationResult = ({ result }) => {
             playSound('POP', 0.5, pitch + (i / absResult / 5));
           }
           
-          // Color de la bolita según si es resultado negativo o positivo
           ctx.fillStyle = isNegative ? '#DC0000' : '#9C27B0';
           
-          // Dibujar la bolita
           ctx.beginPath();
           ctx.arc(x, slideY, circleRadius, 0, 2 * Math.PI);
           ctx.fill();
           
-          // Añadir número junto a la bolita
           if (i / absResult <= resultProgress - 0.05) {
             ctx.fillStyle = isNegative ? '#FFFFFF' : '#000000'; // Color del texto según fondo
             ctx.font = 'bold 14px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(`${i+1}`, x, slideY - circleRadius - 5);
-            // Restaurar color de bolitas
             ctx.fillStyle = isNegative ? '#DC0000' : '#9C27B0';
           }
         }
       }
       
-      // Si el resultado es negativo, agregar una etiqueta de "negativo"
       if (isNegative && resultProgress > 0.9) {
         const labelOpacity = Math.min(1, (resultProgress - 0.9) * 10);
         ctx.fillStyle = `rgba(220, 0, 0, ${labelOpacity})`;
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'left';
         
-        // Colocar la etiqueta al lado de las bolitas
         const labelX = startX + (Math.min(absResult, 10) * spacing) + 10;
         const labelY = resultRowY + Math.floor(0 / 10) * spacing;
         
@@ -702,7 +613,6 @@ const OperationResult = ({ result }) => {
       }
     }
     
-    // Añadir texto explicativo
     if (progress > 0.9) {
       const text = `${num1} - ${num2} = ${result}`;
       ctx.font = 'bold 22px Arial';
@@ -710,46 +620,40 @@ const OperationResult = ({ result }) => {
       
       const textOpacity = Math.min(1, (progress - 0.9) * 10);
       
-      // Fondo para el texto
       ctx.fillStyle = `rgba(255, 255, 255, ${textOpacity * 0.9})`;
       ctx.fillRect(width/2 - textWidth/2 - 10, 380, textWidth + 20, 35);
       ctx.strokeStyle = isNegative ? '#DC0000' : '#9C27B0';
       ctx.lineWidth = 2;
       ctx.strokeRect(width/2 - textWidth/2 - 10, 380, textWidth + 20, 35);
       
-      // Texto
       ctx.fillStyle = isNegative ? `rgba(220, 0, 0, ${textOpacity})` : `rgba(51, 51, 51, ${textOpacity})`;
       ctx.textAlign = 'center';
       ctx.fillText(text, width / 2, 405);
     }
   };
 
-  // Función para animar multiplicación
   const animateMultiplication = (ctx, num1, num2, result, width, height, color, progress) => {
-    // Quitar el título y mostrar instrucción más clara
+    ctx.clearRect(0, 0, width, height);
+    
     ctx.fillStyle = '#333';
-    ctx.font = 'bold 18px Arial';
-    ctx.fillText(`Vamos a multiplicar ${num1} × ${num2}`, width / 2, 30);
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Vamos a multiplicar ${num1} × ${num2}`, width / 2, 35);
     
-    // Visualizar como una grilla
-    const rectSize = 25;
-    const padding = 5;
+    const rectSize = Math.min(30, Math.max(15, 300 / Math.max(num1, num2)));
+    const padding = 10;
     const startX = (width - (num1 * (rectSize + padding))) / 2;
-    const startY = 60;
+    const startY = 80;
     
-    // Play sound effects for multiplication
     if (progress < 0.05 && audioEnabled) {
-      playSound('WHOOSH', 0.7, 1.0);
+      playSound('WHOOSH', 0.4, 1.0);
     }
     
-    // Dibujar grilla con animación por filas
     const rowsToShow = Math.floor(num2 * Math.min(1, progress * 1.5));
     
-    // Contador para elementos totales mostrados
     let totalShown = 0;
     
     for (let i = 0; i < rowsToShow; i++) {
-      // Calcular progreso para esta fila específica
       const rowProgress = Math.min(1, (progress * 1.5 * num2) - i);
       const columnsToShow = Math.floor(num1 * rowProgress);
       
@@ -762,18 +666,15 @@ const OperationResult = ({ result }) => {
         const x = startX + j * (rectSize + padding);
         const y = startY + i * (rectSize + padding);
         
-        // Incrementar contador de elementos mostrados
         totalShown++;
         
-        // Sound for each square (limit frequency to avoid audio overload)
         if (totalShown % 10 === 0 && rowProgress < 0.9 && audioEnabled) {
           playSound('POP', 0.5, 1.0 + (totalShown / (num1 * num2) / 2));
         }
         
         ctx.fillStyle = getMultiplicationColor(i, num2);
         
-        // Agregar efecto de pulsación
-        const pulseEffect = 1 + Math.sin(progress * 10 + i * 0.5 + j * 0.2) * 0.1;
+        const pulseEffect = 1 + Math.sin(progress * 10 + i * 0.5 + j * 0.2) * 0.05;
         const currentSize = rectSize * pulseEffect;
         
         ctx.fillRect(
@@ -783,7 +684,6 @@ const OperationResult = ({ result }) => {
           currentSize
         );
         
-        // Numerar cada elemento para mayor claridad
         if (rowProgress > 0.7) {
           ctx.fillStyle = 'white';
           ctx.font = 'bold 12px Arial';
@@ -793,7 +693,6 @@ const OperationResult = ({ result }) => {
       }
     }
     
-    // Mostrar las filas completadas con números
     if (progress > 0.6) {
       ctx.fillStyle = '#333';
       ctx.font = '16px Arial';
@@ -802,14 +701,12 @@ const OperationResult = ({ result }) => {
       const explanationX = startX + num1 * (rectSize + padding) + 20;
       const explanationY = startY + 20;
       
-      // Mostrar explicación usando grupos
       for (let i = 0; i < rowsToShow; i++) {
         if (i < num2) {
           ctx.fillText(`${num1}`, explanationX, explanationY + i * (rectSize + padding));
         }
       }
       
-      // Mostrar el signo +
       if (rowsToShow > 1) {
         const signsToShow = Math.min(rowsToShow - 1, num2 - 1);
         for (let i = 0; i < signsToShow; i++) {
@@ -818,11 +715,9 @@ const OperationResult = ({ result }) => {
       }
     }
     
-    // Dibujar línea divisoria
     if (progress > 0.8) {
       const lineProgress = Math.min(1, (progress - 0.8) * 5);
       
-      // Play line sound
       if (lineProgress < 0.1 && audioEnabled) {
         playSound('WHOOSH', 0.5, 0.8);
       }
@@ -830,18 +725,16 @@ const OperationResult = ({ result }) => {
       ctx.strokeStyle = color;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(50, startY + num2 * (rectSize + padding) + 20);
-      ctx.lineTo(50 + (width - 100) * lineProgress, startY + num2 * (rectSize + padding) + 20);
+      ctx.moveTo(width/2 - 150, startY + num2 * (rectSize + padding) + 20);
+      ctx.lineTo(width/2 + 150 * lineProgress, startY + num2 * (rectSize + padding) + 20);
       ctx.stroke();
     }
     
-    // Mostrar resultado
     if (progress > 0.9) {
       const resultProgress = Math.min(1, (progress - 0.9) * 10);
       
-      // Play success sound
       if (resultProgress < 0.1 && audioEnabled) {
-        playSound('SUCCESS', 0.7, 1.0);
+        playSound('SUCCESS', 0.4, 1.0);
       }
       
       ctx.fillStyle = '#9C27B0';
@@ -850,39 +743,49 @@ const OperationResult = ({ result }) => {
       
       const finalY = startY + num2 * (rectSize + padding) + 50;
       
-      // Calcular y mostrar el resultado correcto - Asegurarse de que se vea el resultado exacto al final
-      // Animación de contador para el resultado
-      const displayedResult = Math.floor(result * resultProgress);
-      ctx.fillText(`= ${displayedResult}`, width / 2, finalY);
-      
-      // Añadir texto explicativo
       if (resultProgress > 0.9) {
+        ctx.save();
+        
         const text = `${num1} grupos de ${num2} = ${result}`;
         ctx.font = 'bold 22px Arial';
         const textWidth = ctx.measureText(text).width;
         
-        // Fondo para el texto
+        const boxWidth = textWidth + 40;
+        const boxHeight = 40;
+        const boxX = width/2 - boxWidth/2;
+        const boxY = finalY - 10;
+        
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillRect(width/2 - textWidth/2 - 10, finalY + 20, textWidth + 20, 35);
+        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
         ctx.strokeStyle = '#9C27B0';
         ctx.lineWidth = 2;
-        ctx.strokeRect(width/2 - textWidth/2 - 10, finalY + 20, textWidth + 20, 35);
+        ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
         
-        // Texto
         ctx.fillStyle = '#333';
         ctx.textAlign = 'center';
-        ctx.fillText(text, width / 2, finalY + 45);
+        ctx.fillText(text, width / 2, boxY + boxHeight/2 + 7);
+        
+        ctx.restore();
       }
     }
   };
 
-  // Función para animar división
   const animateDivision = (ctx, num1, num2, result, width, height, color, progress) => {
-    // Instrucción clara para niños
+    ctx.clearRect(0, 0, width, height);
+    
+    // Determinar si es un caso especial (dividir un número menor por uno mayor)
+    const isSpecialCase = num1 < num2;
+    
+    // Instrucción clara para niños adaptada según el caso
     ctx.fillStyle = '#333';
     ctx.font = 'bold 18px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(`Vamos a repartir ${num1} elementos en ${num2} grupos iguales`, width / 2, 30);
+    
+    if (isSpecialCase) {
+      ctx.fillText(`Vamos a dividir ${num1} entre ${num2}`, width / 2, 30);
+    } else {
+      ctx.fillText(`Vamos a repartir ${num1} elementos en ${num2} grupos iguales`, width / 2, 30);
+    }
     
     const circleRadius = 15;
     const spacing = 30;
@@ -891,233 +794,620 @@ const OperationResult = ({ result }) => {
     
     // Sound effect at start
     if (progress < 0.05 && audioEnabled) {
-      playSound('WHOOSH', 0.7, 1.0);
+      playSound('WHOOSH', 0.4, 1.0);
     }
     
     // Limitar a 100 elementos máximo para visualización clara
     const totalElements = Math.min(num1, 100);
     
-    // FASE 1: Mostrar todos los elementos juntos
-    if (progress < 0.3) {
-      const initialProgress = Math.min(1, progress * 3.33);
-      const itemsToShow = Math.floor(totalElements * initialProgress);
-      
-      // Play pop sounds for elements appearing
-      const prevItemsShown = Math.floor(totalElements * Math.max(0, (progress - 0.01) * 3.33));
-      if (itemsToShow > prevItemsShown && audioEnabled) {
-        playSound('POP', 0.5, 1.0 + (itemsToShow / totalElements));
-      }
-      
-      // Mostrar elementos como caramelos o frutas para mayor atractivo visual
-      ctx.fillStyle = '#4CAF50';
-      for (let i = 0; i < itemsToShow; i++) {
-        const col = i % 10;
-        const row = Math.floor(i / 10);
+    // Caso especial: número menor dividido por número mayor
+    if (isSpecialCase) {
+      // FASE 1: Mostrar la cantidad total
+      if (progress < 0.3) {
+        const initialProgress = Math.min(1, progress * 3.33);
         
-        const x = startX + col * spacing;
-        const y = startY + row * spacing;
+        // Mostrar el número que vamos a dividir
+        ctx.fillStyle = '#4CAF50';
+        const centerX = width / 2;
+        const centerY = height / 3;
+        const numRadius = 30;
         
-        // Dibujar círculo con borde para simular caramelos
         ctx.beginPath();
-        ctx.arc(x, y, circleRadius, 0, 2 * Math.PI);
+        ctx.arc(centerX, centerY, numRadius, 0, 2 * Math.PI);
         ctx.fill();
         
-        // Añadir número a cada elemento
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${i+1}`, x, y + 3);
+        if (initialProgress > 0.7) {
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 18px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${num1}`, centerX, centerY + 6);
+          
+          // Texto explicativo
+          const textOpacity = Math.min(1, (initialProgress - 0.7) * 3);
+          ctx.fillStyle = `rgba(51, 51, 51, ${textOpacity})`;
+          ctx.font = '18px Arial';
+          ctx.fillText(`Tenemos ${num1} para dividir entre ${num2}`, width / 2, centerY + 80);
+        }
+      }
+      // FASE 2: Mostrar el divisor y el proceso
+      else if (progress < 0.7) {
+        const phaseProgress = Math.min(1, (progress - 0.3) * 2.5);
+        
+        // Dibujar el número a dividir
         ctx.fillStyle = '#4CAF50';
-      }
-      
-      // Mostrar texto explicativo
-      if (initialProgress > 0.7) {
-        ctx.fillStyle = color;
-        ctx.font = '18px Arial';
+        const centerX = width / 2;
+        const centerY = height / 3;
+        const numRadius = 30;
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, numRadius, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 18px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(`Tenemos ${num1} elementos`, width / 2, startY + Math.ceil(totalElements / 10) * spacing + 30);
+        ctx.fillText(`${num1}`, centerX, centerY + 6);
         
-        // Segundo mensaje animado
-        const secondTextOpacity = Math.min(1, (initialProgress - 0.7) * 3);
-        ctx.fillStyle = `rgba(51, 51, 51, ${secondTextOpacity})`;
-        ctx.fillText(`Los vamos a repartir en ${num2} grupos iguales`, width / 2, startY + Math.ceil(totalElements / 10) * spacing + 60);
-        
-        // Sound for explanation
-        if (initialProgress > 0.9 && initialProgress < 0.92 && audioEnabled) {
-          playSound('WHOOSH', 0.5, 0.8);
-        }
-      }
-    } 
-    // FASE 2: Agrupar los elementos con animación clara
-    else {
-      const groupingProgress = Math.min(1, (progress - 0.3) * 1.4);
-      
-      // Sound for grouping phase
-      if (groupingProgress < 0.05 && audioEnabled) {
-        playSound('WHOOSH', 0.6, 1.2);
-      }
-      
-      // Calcular cuántos elementos van en cada grupo
-      const elementsPerGroup = Math.floor(num1 / num2);
-      const remainder = num1 % num2;
-      
-      // Dibuja cajas/contenedores para los grupos primero
-      if (groupingProgress > 0.1) {
-        const boxProgress = Math.min(1, (groupingProgress - 0.1) * 2);
-        
-        // Sound for boxes appearing
-        if (boxProgress < 0.1 && audioEnabled) {
-          playSound('POP', 0.5, 0.8);
-        }
-        
-        for (let g = 0; g < num2; g++) {
-          const groupRow = Math.floor(g / 3);
-          const groupCol = g % 3;
+        // Mostrar el divisor
+        if (phaseProgress > 0.2) {
+          const divisorOpacity = Math.min(1, (phaseProgress - 0.2) * 2);
           
-          const boxWidth = spacing * (elementsPerGroup + 1);
-          const boxHeight = spacing * 3;
-          const boxX = startX + groupCol * (boxWidth + spacing * 2);
-          const boxY = startY + 120 + groupRow * (boxHeight + spacing);
+          ctx.fillStyle = `rgba(33, 150, 243, ${divisorOpacity})`;
+          ctx.font = 'bold 24px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(`÷ ${num2}`, centerX, centerY + 80);
           
-          // Dibujar caja con opacidad creciente
-          ctx.fillStyle = `rgba(240, 240, 240, ${boxProgress})`;
-          ctx.strokeStyle = `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, ${boxProgress})`;
-          ctx.lineWidth = 2;
-          
-          ctx.beginPath();
-          ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 10);
-          ctx.fill();
-          ctx.stroke();
-          
-          // Añadir etiqueta al grupo
-          if (boxProgress > 0.5) {
-            ctx.fillStyle = `rgba(51, 51, 51, ${boxProgress})`;
-            ctx.font = 'bold 14px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(`Grupo ${g+1}`, boxX + boxWidth/2, boxY - 10);
+          // Dibujar una torta dividida en el número de partes del divisor
+          if (phaseProgress > 0.4) {
+            const pieProgress = Math.min(1, (phaseProgress - 0.4) * 1.7);
+            
+            // Colores para la torta
+            const pieColors = ['#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107'];
+            
+            // Posición de la torta
+            const pieX = width / 4;
+            const pieY = centerY + 140;
+            const pieRadius = 60;
+            
+            // Dibujar la torta (círculo dividido en 'num2' partes)
+            drawPieChart(
+              ctx, 
+              pieX, 
+              pieY, 
+              pieRadius, 
+              num2,           // El divisor es el número total de partes
+              num1,           // El dividendo es el número de partes seleccionadas
+              pieColors, 
+              pieProgress, 
+              true            // Mostrar etiquetas
+            );
+            
+            // Texto explicativo para la torta
+            if (pieProgress > 0.8) {
+              const textOpacity = Math.min(1, (pieProgress - 0.8) * 5);
+              ctx.fillStyle = `rgba(33, 33, 33, ${textOpacity})`;
+              ctx.font = '14px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText(`La torta se divide en ${num2} partes`, pieX, pieY + pieRadius + 25);
+              ctx.fillText(`y tomamos ${num1} partes`, pieX, pieY + pieRadius + 45);
+            }
+            
+            // Explicación visual: fracción (a la derecha de la torta)
+            const fractionOpacity = Math.min(1, (phaseProgress - 0.4) * 2);
+            
+            // Ubicar la fracción a la derecha de la torta
+            const fractionX = width * 3/4;
+            const fractionY = pieY;
+            
+            // Dibujar línea de fracción
+            ctx.strokeStyle = `rgba(33, 150, 243, ${fractionOpacity})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(fractionX - 30, fractionY);
+            ctx.lineTo(fractionX + 30, fractionY);
+            ctx.stroke();
+            
+            // Numerador
+            ctx.fillStyle = `rgba(33, 150, 243, ${fractionOpacity})`;
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText(`${num1}`, fractionX, fractionY - 10);
+            
+            // Denominador
+            ctx.fillText(`${num2}`, fractionX, fractionY + 30);
+            
+            // Texto explicativo para la fracción
+            if (pieProgress > 0.8) {
+              const textOpacity = Math.min(1, (pieProgress - 0.8) * 5);
+              ctx.fillStyle = `rgba(33, 33, 33, ${textOpacity})`;
+              ctx.font = '14px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText(`Esto es lo mismo que la fracción`, fractionX, fractionY + 60);
+              ctx.fillText(`${num1}/${num2} = ${result}`, fractionX, fractionY + 80);
+            }
           }
         }
       }
-      
-      // Mover elementos a sus grupos correspondientes
-      for (let i = 0; i < totalElements; i++) {
-        const groupIndex = Math.min(Math.floor(i / elementsPerGroup), num2 - 1);
-        const itemInGroup = i - (groupIndex * elementsPerGroup);
+      // FASE 3: Mostrar el resultado
+      else {
+        const resultProgress = Math.min(1, (progress - 0.7) * 3.33);
         
-        // Si hay un resto, distribuirlo equitativamente
-        let adjustedGroupIndex = groupIndex;
-        if (groupIndex === num2 - 1 && itemInGroup >= elementsPerGroup + remainder) {
-          continue; // Skip excess elements
+        // Play sound for result
+        if (resultProgress < 0.1 && audioEnabled) {
+          playSound('SUCCESS', 0.4, 1.0);
         }
         
-        // Calcular posición inicial (todos juntos)
-        const initialCol = i % 10;
-        const initialRow = Math.floor(i / 10);
-        const initialX = startX + initialCol * spacing;
-        const initialY = startY + initialRow * spacing;
+        // Dibujar el número a dividir
+        ctx.fillStyle = '#4CAF50';
+        const centerX = width / 2;
+        const centerY = height / 4;  // Movido más arriba para dar más espacio
+        const numRadius = 30;
         
-        // Calcular posición final (en grupos)
-        const groupRow = Math.floor(adjustedGroupIndex / 3);
-        const groupCol = adjustedGroupIndex % 3;
-        
-        const boxWidth = spacing * (elementsPerGroup + 1);
-        const boxHeight = spacing * 3;
-        const boxX = startX + groupCol * (boxWidth + spacing * 2);
-        const boxY = startY + 120 + groupRow * (boxHeight + spacing);
-        
-        // Posición dentro del grupo
-        const itemCol = itemInGroup % 3;
-        const itemRow = Math.floor(itemInGroup / 3);
-        const finalX = boxX + spacing + itemCol * spacing;
-        const finalY = boxY + spacing + itemRow * spacing;
-        
-        // Retrasar el movimiento de cada elemento para un efecto cascada
-        const delay = i / totalElements * 0.3;
-        const elementProgress = Math.max(0, Math.min(1, (groupingProgress - delay) * 1.5));
-        
-        // Interpolar entre posición inicial y final
-        const x = initialX + (finalX - initialX) * elementProgress;
-        const y = initialY + (finalY - initialY) * elementProgress;
-        
-        // Sound for every 5th element moving
-        if (elementProgress > 0 && elementProgress < 0.1 && i % 5 === 0 && audioEnabled) {
-          playSound('POP', 0.5, 0.8 + (i / totalElements));
-        }
-        
-        // Colorear cada grupo diferente
-        const colors = ['#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#795548', '#009688'];
-        const targetColor = colors[adjustedGroupIndex % colors.length];
-        
-        // Transición de color
-        const currentColor = fadeColor('#4CAF50', targetColor, elementProgress);
-        ctx.fillStyle = currentColor;
-        
-        // Dibujar el elemento
         ctx.beginPath();
-        ctx.arc(x, y, circleRadius, 0, 2 * Math.PI);
+        ctx.arc(centerX, centerY, numRadius, 0, 2 * Math.PI);
         ctx.fill();
         
-        // Añadir número a cada elemento
-        if (elementProgress > 0.5) {
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${num1}`, centerX, centerY + 6);
+        
+        // Divisor
+        ctx.fillStyle = `rgba(33, 150, 243, 1)`;
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText(`÷ ${num2}`, centerX, centerY + 80);
+        
+        // Dibujar representación visual con torta completa
+        if (resultProgress > 0.2) {
+          const pieProgress = Math.min(1, (resultProgress - 0.2) * 2);
+          
+          // Colores para la torta
+          const pieColors = ['#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', 
+                           '#FF9800', '#FF5722', '#F44336', '#E91E63', '#9C27B0'];
+          
+          // Posición y tamaño de la torta
+          const pieRadius = 70;
+          
+          // Dibujar la torta en el centro
+          drawPieChart(
+            ctx, 
+            centerX, 
+            centerY + 180,
+            pieRadius, 
+            num2,           // El divisor es el número total de partes
+            num1,           // El dividendo es el número de partes seleccionadas
+            pieColors, 
+            pieProgress, 
+            true            // Mostrar etiquetas
+          );
+          
+          // Texto explicativo sobre la torta
+          if (pieProgress > 0.8) {
+            const textOpacity = Math.min(1, (pieProgress - 0.8) * 5);
+            ctx.fillStyle = `rgba(33, 33, 33, ${textOpacity})`;
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${num1} partes de ${num2} = ${result} de una torta completa`, 
+                        centerX, centerY + 170 + pieRadius + 30);
+          }
+        }
+        
+        // Explicación visual con ejemplos concretos
+        if (resultProgress > 0.4) {
+          const visualOpacity = Math.min(1, (resultProgress - 0.4) * 1.7);
+          
+          ctx.fillStyle = `rgba(51, 51, 51, ${visualOpacity})`;
+          ctx.font = '18px Arial';
+          ctx.textAlign = 'center';
+          
+          const midY = centerY + 300;
+          
+          // Título explicativo
+          ctx.font = 'bold 20px Arial';
+          ctx.fillStyle = `rgba(33, 33, 33, ${visualOpacity})`;
+          ctx.fillText(`Cuando dividimos un número más pequeño`, width / 2, midY);
+          ctx.fillText(`entre uno más grande:`, width / 2, centerY + 320);
+          
+          // Explicación con ejemplos claros
+          ctx.font = '18px Arial';
+          ctx.fillStyle = `rgba(33, 33, 33, ${visualOpacity})`;
+          
+          // Ejemplo 1: Cómo entender la división
+          const example1Y = midY + 50;
+          // ctx.fillText(`Preguntamos: ¿cuántas veces cabe ${num2} en ${num1}?`, width / 2, example1Y);
+          
+          // Ejemplo 2: Equivalencia con fracción
+          const example2Y = example1Y + 30;
+          // ctx.fillText(`Es como escribir la fracción ${num1}/${num2} = ${result}`, width / 2, example2Y);
+        }
+        
+        // Mostrar resultado final con animación
+        if (resultProgress > 0.6) {
+          const formulaProgress = Math.min(1, (resultProgress - 0.6) * 2.5);
+          
+          // Formula visual clara
+          const formula = `${num1} ÷ ${num2} = ${result}`;
+          const formulaOpacity = formulaProgress;
+          
+          // Para la fórmula
+          ctx.font = 'bold 24px Arial';
+          const formulaWidth = ctx.measureText(formula).width;
+          
+          // Calcular posición más abajo para evitar sobreposición
+          const formulaY = height - 90;
+          
+          // Fondo para la fórmula
+          ctx.fillStyle = `rgba(255, 255, 255, ${formulaOpacity * 0.9})`;
+          ctx.fillRect(width/2 - formulaWidth/2 - 15, formulaY - 25, formulaWidth + 30, 40);
+          ctx.strokeStyle = '#9C27B0';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(width/2 - formulaWidth/2 - 15, formulaY - 25, formulaWidth + 30, 40);
+          
+          // Texto de la fórmula
+          ctx.fillStyle = `rgba(156, 39, 176, ${formulaOpacity})`;
+          ctx.textAlign = 'center';
+          ctx.fillText(formula, width / 2, formulaY + 5);
+          
+          // Explicación adicional
+          if (formulaProgress > 0.8) {
+            const explProgress = Math.min(1, (formulaProgress - 0.8) * 5);
+            
+            // Formato el resultado para mostrar solo 2 decimales si es necesario
+            const formattedResult = Number.isInteger(result) ? result : Math.round(result * 100) / 100;
+            
+            const explanation = `${num1} cabe ${formattedResult} veces en ${num2}`;
+            
+            ctx.font = 'bold 20px Arial';
+            const explWidth = ctx.measureText(explanation).width;
+            
+            // Posicionar más abajo para evitar sobreposición
+            const explY = height - 30;
+            
+            ctx.fillStyle = `rgba(255, 255, 255, ${explProgress * 0.9})`;
+            ctx.fillRect(width/2 - explWidth/2 - 15, explY - 25, explWidth + 30, 40);
+            ctx.strokeStyle = '#9C27B0';
+            ctx.strokeRect(width/2 - explWidth/2 - 15, explY - 25, explWidth + 30, 40);
+            
+            ctx.fillStyle = `rgba(33, 33, 33, ${explProgress})`;
+            ctx.fillText(explanation, width / 2, explY + 5);
+          }
+        }
+      }
+    }
+    // Caso normal: número mayor dividido por número menor
+    else {
+      // FASE 1: Mostrar todos los elementos juntos
+      if (progress < 0.3) {
+        const initialProgress = Math.min(1, progress * 3.33);
+        const itemsToShow = Math.floor(totalElements * initialProgress);
+        
+        // Play pop sounds for elements appearing
+        const prevItemsShown = Math.floor(totalElements * Math.max(0, (progress - 0.01) * 3.33));
+        if (itemsToShow > prevItemsShown && audioEnabled) {
+          playSound('POP', 0.5, 1.0 + (itemsToShow / totalElements));
+        }
+        
+        ctx.fillStyle = '#4CAF50';
+        for (let i = 0; i < itemsToShow; i++) {
+          const col = i % 10;
+          const row = Math.floor(i / 10);
+          
+          const x = startX + col * spacing;
+          const y = startY + row * spacing;
+          
+          ctx.beginPath();
+          ctx.arc(x, y, circleRadius, 0, 2 * Math.PI);
+          ctx.fill();
+          
           ctx.fillStyle = 'white';
           ctx.font = 'bold 10px Arial';
           ctx.textAlign = 'center';
           ctx.fillText(`${i+1}`, x, y + 3);
-        }
-      }
-      
-      // Mostrar resultado y explicación
-      if (groupingProgress > 0.85) {
-        const resultOpacity = Math.min(1, (groupingProgress - 0.85) * 6.67);
-        
-        // Play sound for result
-        if (resultOpacity < 0.1 && audioEnabled) {
-          playSound('SUCCESS', 0.7, 1.0);
+          ctx.fillStyle = '#4CAF50';
         }
         
-        // Texto de explicación
-        ctx.fillStyle = `rgba(51, 51, 51, ${resultOpacity})`;
-        ctx.font = 'bold 22px Arial';
-        ctx.textAlign = 'center';
-        
-        // Formula visual clara
-        const formula = `${num1} ÷ ${num2} = ${result}`;
-        
-        // Explicación adaptada a niños
-        let explanation;
-        if (num1 % num2 === 0) {
-          explanation = `Cada grupo tiene exactamente ${result} elementos`;
-        } else {
-          explanation = `Cada grupo tiene ${Math.floor(result)} elementos y sobran ${num1 % num2}`;
-        }
-        
-        // Fondo para los textos
-        if (resultOpacity > 0.3) {
-          // Para la fórmula
-          const formulaWidth = ctx.measureText(formula).width;
-          ctx.fillStyle = `rgba(255, 255, 255, ${resultOpacity * 0.9})`;
-          ctx.fillRect(width/2 - formulaWidth/2 - 10, height - 80, formulaWidth + 20, 35);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 2;
-          ctx.strokeRect(width/2 - formulaWidth/2 - 10, height - 80, formulaWidth + 20, 35);
+        // Mostrar texto explicativo
+        if (initialProgress > 0.7) {
+          ctx.fillStyle = color;
+          ctx.font = '18px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(`Tenemos ${num1} elementos`, width / 2, startY + Math.ceil(totalElements / 10) * spacing + 30);
           
-          // Para la explicación
-          const explanationWidth = ctx.measureText(explanation).width;
-          ctx.fillStyle = `rgba(255, 255, 255, ${resultOpacity * 0.9})`;
-          ctx.fillRect(width/2 - explanationWidth/2 - 10, height - 40, explanationWidth + 20, 35);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 2;
-          ctx.strokeRect(width/2 - explanationWidth/2 - 10, height - 40, explanationWidth + 20, 35);
+          // Segundo mensaje animado
+          const secondTextOpacity = Math.min(1, (initialProgress - 0.7) * 3);
+          ctx.fillStyle = `rgba(51, 51, 51, ${secondTextOpacity})`;
+          ctx.fillText(`Los vamos a repartir en ${num2} grupos iguales`, width / 2, startY + Math.ceil(totalElements / 10) * spacing + 60);
+          
+          // Sound for explanation
+          if (initialProgress > 0.9 && initialProgress < 0.92 && audioEnabled) {
+            playSound('WHOOSH', 0.5, 0.8);
+          }
+        }
+      } 
+      // FASE 2: Agrupar los elementos con animación clara
+      else {
+        const groupingProgress = Math.min(1, (progress - 0.3) * 1.4);
+        
+        // Sound for grouping phase
+        if (groupingProgress < 0.05 && audioEnabled) {
+          playSound('WHOOSH', 0.4, 1.2);
         }
         
-        // Textos
-        ctx.fillStyle = `rgba(51, 51, 51, ${resultOpacity})`;
-        ctx.font = 'bold 22px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(formula, width/2, height - 55);
+        // Calcular cuántos elementos van en cada grupo
+        const elementsPerGroup = Math.floor(num1 / num2);
+        const remainder = num1 % num2;
         
-        ctx.font = 'bold 18px Arial';
-        ctx.fillText(explanation, width/2, height - 15);
+        // Dibuja torta para visualizar la división
+        if (groupingProgress > 0.1 && groupingProgress < 0.4) {
+          const pieProgress = Math.min(1, (groupingProgress - 0.1) * 3.3);
+          
+          // Dibujar primero una torta completa que representa el total (num1)
+          const centerX = width / 2;
+          const centerY = startY + 50;
+          const pieRadius = 70;
+          
+          // Colores para la torta
+          const pieColors = ['#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', 
+                           '#FF9800', '#FF5722', '#F44336', '#E91E63', '#9C27B0'];
+          
+          // Título para la torta
+          ctx.fillStyle = `rgba(33, 33, 33, ${pieProgress})`;
+          ctx.font = 'bold 16px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(`Tenemos ${num1} porciones de torta para dividir en ${num2} grupos`, 
+                     centerX, centerY - pieRadius - 20);
+          
+          // Dibujar la torta completa con num1 porciones
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, pieRadius, 0, Math.PI * 2);
+          ctx.fillStyle = '#4CAF50';
+          ctx.fill();
+          
+          // Dividir la torta en num1 porciones (ángulos)
+          const sliceAngle = (Math.PI * 2) / num1;
+          
+          for (let i = 0; i < num1 * pieProgress; i++) {
+            // Calcular ángulos para cada porción
+            const startAngle = i * sliceAngle - Math.PI/2;
+            const endAngle = startAngle + sliceAngle;
+            
+            // Dibujar líneas divisorias
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(
+              centerX + Math.cos(startAngle) * pieRadius,
+              centerY + Math.sin(startAngle) * pieRadius
+            );
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Añadir números a algunas porciones (cada 5 porciones si hay muchas)
+            if (i % Math.max(1, Math.floor(num1 / 10)) === 0) {
+              const textAngle = startAngle + sliceAngle / 2;
+              const textRadius = pieRadius * 0.7;
+              const textX = centerX + Math.cos(textAngle) * textRadius;
+              const textY = centerY + Math.sin(textAngle) * textRadius;
+              
+              ctx.fillStyle = 'white';
+              ctx.font = 'bold 14px Arial';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(`${i+1}`, textX, textY);
+            }
+          }
+          
+          // Mostrar explicación de lo que vamos a hacer
+          if (pieProgress > 0.7) {
+            const textOpacity = Math.min(1, (pieProgress - 0.7) * 3.3);
+            ctx.fillStyle = `rgba(33, 33, 33, ${textOpacity})`;
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Ahora vamos a dividir estas ${num1} porciones en ${num2} grupos iguales`, 
+                       centerX, centerY + pieRadius + 25);
+            
+            // Segunda línea de explicación
+            if (remainder === 0) {
+              ctx.fillText(`Cada grupo tendrá exactamente ${elementsPerGroup} porciones`, 
+                         centerX, centerY + pieRadius + 50);
+            } else {
+              ctx.fillText(`Cada grupo tendrá ${elementsPerGroup} porciones y sobrarán ${remainder}`, 
+                         centerX, centerY + pieRadius + 50);
+            }
+          }
+        }
+        
+        // Dibuja cajas/contenedores para los grupos primero
+        if (groupingProgress > 0.4) {
+          const boxProgress = Math.min(1, (groupingProgress - 0.4) * 1.7);
+          
+          // Sound for boxes appearing
+          if (boxProgress < 0.1 && audioEnabled) {
+            playSound('POP', 0.5, 0.8);
+          }
+          
+          // Ajustar posición de inicio para que aparezca debajo de la torta
+          const boxStartY = startY + 170;
+          
+          for (let g = 0; g < num2; g++) {
+            const groupRow = Math.floor(g / 3);
+            const groupCol = g % 3;
+            
+            const boxWidth = spacing * (elementsPerGroup + 1);
+            const boxHeight = spacing * 3;
+            const boxX = startX + groupCol * (boxWidth + spacing * 2);
+            const boxY = boxStartY + groupRow * (boxHeight + spacing);
+            
+            // Dibujar caja con opacidad creciente
+            ctx.fillStyle = `rgba(240, 240, 240, ${boxProgress})`;
+            ctx.strokeStyle = `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, ${boxProgress})`;
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 10);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Dibujar mini torta en cada grupo
+            if (boxProgress > 0.7) {
+              const miniPieRadius = 20;
+              const miniPieX = boxX + boxWidth / 2;
+              const miniPieY = boxY - miniPieRadius - 10;
+              
+              // Colores para las mini tortas
+              const miniPieColors = ['#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107'];
+              
+              // Solo dibujar la mini torta si hay elementos para este grupo
+              if (g < num2 - 1 || (g === num2 - 1 && remainder > 0)) {
+                // Determinar cuántas porciones para este grupo
+                const porciones = g === num2 - 1 ? elementsPerGroup + remainder : elementsPerGroup;
+                
+                // Dibujar mini torta
+                drawPieChart(
+                  ctx, 
+                  miniPieX, 
+                  miniPieY, 
+                  miniPieRadius,
+                  porciones,         // Cada mini torta tiene elementsPerGroup partes
+                  porciones,         // Todas las partes están seleccionadas
+                  miniPieColors,
+                  boxProgress,
+                  false              // No mostrar etiquetas en las mini tortas
+                );
+              }
+            }
+            
+            // Añadir etiqueta al grupo
+            if (boxProgress > 0.5) {
+              ctx.fillStyle = `rgba(51, 51, 51, ${boxProgress})`;
+              ctx.font = 'bold 14px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText(`Grupo ${g+1}`, boxX + boxWidth/2, boxY - 10);
+            }
+          }
+        }
+        
+        // Mover elementos a sus grupos correspondientes
+        for (let i = 0; i < totalElements; i++) {
+          const groupIndex = Math.min(Math.floor(i / elementsPerGroup), num2 - 1);
+          const itemInGroup = i - (groupIndex * elementsPerGroup);
+          
+          // Si hay un resto, distribuirlo equitativamente
+          let adjustedGroupIndex = groupIndex;
+          if (groupIndex === num2 - 1 && itemInGroup >= elementsPerGroup + remainder) {
+            continue; // Skip excess elements
+          }
+          
+          // Calcular posición inicial (todos juntos)
+          const initialCol = i % 10;
+          const initialRow = Math.floor(i / 10);
+          const initialX = startX + initialCol * spacing;
+          const initialY = startY + initialRow * spacing;
+          
+          // Calcular posición final (en grupos)
+          const groupRow = Math.floor(adjustedGroupIndex / 3);
+          const groupCol = adjustedGroupIndex % 3;
+          
+          const boxWidth = spacing * (elementsPerGroup + 1);
+          const boxHeight = spacing * 3;
+          const boxX = startX + groupCol * (boxWidth + spacing * 2);
+          
+          // Ajustar boxY para que aparezca debajo de la torta
+          const boxY = startY + 170 + groupRow * (boxHeight + spacing);
+          
+          // Posición dentro del grupo
+          const itemCol = itemInGroup % 3;
+          const itemRow = Math.floor(itemInGroup / 3);
+          const finalX = boxX + spacing + itemCol * spacing;
+          const finalY = boxY + spacing + itemRow * spacing;
+          
+          // Retrasar el movimiento de cada elemento para un efecto cascada
+          const delay = i / totalElements * 0.3;
+          const elementProgress = Math.max(0, Math.min(1, (groupingProgress - delay - 0.4) * 1.5));
+          
+          // Interpolar entre posición inicial y final
+          const x = initialX + (finalX - initialX) * elementProgress;
+          const y = initialY + (finalY - initialY) * elementProgress;
+          
+          // Sound for every 5th element moving
+          if (elementProgress > 0 && elementProgress < 0.1 && i % 5 === 0 && audioEnabled) {
+            playSound('POP', 0.5, 0.8 + (i / totalElements));
+          }
+          
+          // Colorear cada grupo diferente
+          const colors = ['#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#795548', '#009688'];
+          const targetColor = colors[adjustedGroupIndex % colors.length];
+          
+          // Transición de color
+          const currentColor = fadeColor('#4CAF50', targetColor, elementProgress);
+          ctx.fillStyle = currentColor;
+          
+          // Dibujar el elemento
+          ctx.beginPath();
+          ctx.arc(x, y, circleRadius, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          // Añadir número a cada elemento
+          if (elementProgress > 0.5) {
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${i+1}`, x, y + 3);
+          }
+        }
+        
+        // Mostrar resultado y explicación
+        if (groupingProgress > 0.85) {
+          const resultOpacity = Math.min(1, (groupingProgress - 0.85) * 6.67);
+          
+          // Play sound for result
+          if (resultOpacity < 0.1 && audioEnabled) {
+            playSound('SUCCESS', 0.4, 1.0);
+          }
+          
+          // Texto de explicación
+          ctx.fillStyle = `rgba(51, 51, 51, ${resultOpacity})`;
+          ctx.font = 'bold 22px Arial';
+          ctx.textAlign = 'center';
+          
+          // Formula visual clara
+          const formula = `${num1} ÷ ${num2} = ${result}`;
+          
+          // Explicación adaptada a niños
+          let explanation;
+          if (num1 % num2 === 0) {
+            explanation = `Cada grupo tiene exactamente ${result} elementos`;
+          } else {
+            explanation = `Cada grupo tiene ${Math.floor(result)} elementos y sobran ${num1 % num2}`;
+          }
+          
+          // Fondo para los textos
+          if (resultOpacity > 0.3) {
+            // Para la fórmula
+            const formulaWidth = ctx.measureText(formula).width;
+            ctx.fillStyle = `rgba(255, 255, 255, ${resultOpacity * 0.9})`;
+            ctx.fillRect(width/2 - formulaWidth/2 - 10, height - 80, formulaWidth + 20, 35);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(width/2 - formulaWidth/2 - 10, height - 80, formulaWidth + 20, 35);
+            
+            // Para la explicación
+            const explanationWidth = ctx.measureText(explanation).width;
+            ctx.fillStyle = `rgba(255, 255, 255, ${resultOpacity * 0.9})`;
+            ctx.fillRect(width/2 - explanationWidth/2 - 10, height - 40, explanationWidth + 20, 35);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(width/2 - explanationWidth/2 - 10, height - 40, explanationWidth + 20, 35);
+          }
+          
+          // Textos
+          ctx.fillStyle = `rgba(51, 51, 51, ${resultOpacity})`;
+          ctx.font = 'bold 22px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(formula, width/2, height - 55);
+          
+          ctx.font = 'bold 18px Arial';
+          ctx.fillText(explanation, width/2, height - 15);
+        }
       }
     }
   };
@@ -1157,64 +1447,131 @@ const OperationResult = ({ result }) => {
     return `hsl(${hue}, 70%, 50%)`;
   };
 
-  return (
-    <div className="operation-result">
-      <h3 className="result-title">Resultado de la {operation?.name || 'operación'}</h3>
+  // Función auxiliar para dibujar un gráfico circular (torta) para la visualización de división
+  const drawPieChart = (ctx, centerX, centerY, radius, parts, selectedParts, colors, progress, showLabels = true) => {
+    const totalAngle = Math.PI * 2;
+    const anglePerPart = totalAngle / parts;
+    
+    // Fondo de la torta completa (círculo gris claro)
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, totalAngle);
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fill();
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    // Dibuja las divisiones de la torta
+    for (let i = 0; i < parts; i++) {
+      const startAngle = i * anglePerPart - Math.PI/2;
+      const endAngle = startAngle + anglePerPart;
       
-      <div className="result-display">
-        <div className="result-equation" style={{ backgroundColor: operation.color }}>
-          {firstNumber} {operation.symbol} {secondNumber} = {computedResult}
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctx.closePath();
+      ctx.strokeStyle = '#777';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    
+    // Animación de las partes seleccionadas
+    const partsToShow = Math.min(selectedParts, Math.floor(selectedParts * progress * 1.5));
+    const partialProgress = (selectedParts * progress * 1.5) - Math.floor(selectedParts * progress * 1.5);
+    
+    for (let i = 0; i < partsToShow; i++) {
+      const startAngle = i * anglePerPart - Math.PI/2;
+      const endAngle = startAngle + anglePerPart;
+      
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctx.closePath();
+      
+      // Alternar colores para mejor visualización
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.fill();
+    }
+    
+    // Mostrar la parte parcial final
+    if (partialProgress > 0 && partsToShow < selectedParts) {
+      const startAngle = partsToShow * anglePerPart - Math.PI/2;
+      const endAngle = startAngle + (anglePerPart * partialProgress);
+      
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctx.closePath();
+      
+      ctx.fillStyle = colors[partsToShow % colors.length];
+      ctx.fill();
+    }
+    
+    // Etiquetas para las secciones
+    if (showLabels && progress > 0.7) {
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      for (let i = 0; i < parts; i++) {
+        const angle = i * anglePerPart + (anglePerPart / 2) - Math.PI/2;
+        const labelRadius = radius * 0.75;
+        const x = centerX + Math.cos(angle) * labelRadius;
+        const y = centerY + Math.sin(angle) * labelRadius;
+        
+        // Etiqueta con el número de parte
+        ctx.fillText(`${i+1}`, x, y);
+      }
+      
+      // Etiqueta en el centro
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(`${selectedParts}/${parts}`, centerX, centerY);
+    }
+  };
+
+  return (
+    <div className="operation-result-container" style={{ borderColor: operation.color }}>
+      <div className="result-header" style={{ backgroundColor: operation.color }}>
+        <h3>Resultado: {computedResult}</h3>
+        <div className="controls">
+          <button 
+            className={`control-button ${audioEnabled ? 'active' : 'inactive'}`}
+            onClick={toggleAudio}
+            title={audioEnabled ? "Desactivar sonido" : "Activar sonido"}
+          >
+            {audioEnabled ? '🔊' : '🔇'}
+          </button>
+          <button 
+            className="control-button"
+            onClick={restartAnimation}
+            disabled={isAnimating}
+            title="Repetir animación"
+          >
+            🔄
+          </button>
         </div>
       </div>
       
-      <div className="visualization-container">
-        <canvas 
-          ref={canvasRef} 
-          className="visualization-canvas" 
-          width="700" 
-          height="450" 
-        />
-      </div>
-      
-      <div className="explanation-box">
-        <h4>Explicación:</h4>
-        <p>{explanation}</p>
+      <div className="result-content">
+        <div className="result-text">
+          <p className="explanation">{explanation}</p>
+          <div className="expression">
+            <span className="number">{firstNumber}</span>
+            <span className="operation-symbol" style={{ color: operation.color }}>{operation.symbol}</span>
+            <span className="number">{secondNumber}</span>
+            <span className="equals">=</span>
+            <span className="result-number" style={{ color: operation.color }}>{computedResult}</span>
+          </div>
+        </div>
         
-        <div className="button-container">
-          {isSpeakingNow ? (
-            <button 
-              className="stop-button" 
-              style={{ backgroundColor: '#d32f2f' }}
-              onClick={handleStopSpeaking}
-            >
-              🔇 Detener voz
-            </button>
-          ) : (
-            <button 
-              className="speak-button"
-              style={{ backgroundColor: operation.color }}
-              onClick={handleSpeak}
-            >
-              🔊 Escuchar explicación
-            </button>
-          )}
-          
-          <button
-            className="replay-button"
-            style={{ backgroundColor: operation.color }}
-            onClick={restartAnimation}
-            disabled={isAnimating}
-          >
-            🔄 Repetir animación
-          </button>
-          
-          <button
-            className="audio-toggle-button"
-            style={{ backgroundColor: audioEnabled ? '#4CAF50' : '#9e9e9e' }}
-            onClick={toggleAudio}
-          >
-            {audioEnabled ? '🔊 Sonidos: Activados' : '🔇 Sonidos: Desactivados'}
-          </button>
+        <div className="result-visualization">
+          <canvas 
+            ref={canvasRef} 
+            width="550" 
+            height="600" 
+            className="visualization-canvas"
+          />
         </div>
       </div>
     </div>
