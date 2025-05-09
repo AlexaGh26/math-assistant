@@ -1,0 +1,34 @@
+{
+  "name": "math-assistant",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "ollama:install": "echo 'Visita https://ollama.com/download para instrucciones de instalación de Ollama'",
+    "ollama:models": "echo 'Ejecutando Ollama para listar modelos disponibles...' && curl http://localhost:11434/api/tags",
+    "ollama:pull:llama3": "echo 'Descargando modelo Llama 3 (aproximadamente 3GB)...' && curl -X POST http://localhost:11434/api/pull -d '{\"name\": \"llama3\"}'",
+    "ollama:pull:mistral": "echo 'Descargando modelo Mistral (aproximadamente 4GB)...' && curl -X POST http://localhost:11434/api/pull -d '{\"name\": \"mistral\"}'"
+  },
+  "dependencies": {
+    "axios": "^1.9.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-speech-recognition": "^4.0.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react-swc": "^3.9.0",
+    "eslint": "^9.25.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "globals": "^16.0.0",
+    "vite": "^6.3.5"
+  }
+}

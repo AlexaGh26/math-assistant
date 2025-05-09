@@ -1,0 +1,90 @@
+.operation-buttons-container {
+  background-color: #f8f9fa;
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  width: 100%;
+  max-width: 650px;
+  min-height: 250px;
+}
+
+.operation-title {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.operation-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+}
+
+.operation-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 110px;
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.operation-button:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.operation-icon {
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+}
+
+.operation-name {
+  font-size: 1rem;
+}
+
+/* Media queries para responsividad */
+@media (max-width: 600px) {
+  .operation-buttons-container {
+    padding: 15px;
+  }
+  
+  .operation-buttons {
+    gap: 10px;
+  }
+  
+  .operation-button {
+    width: 100px;
+    height: 95px;
+  }
+  
+  .operation-icon {
+    font-size: 2rem;
+  }
+  
+  .operation-name {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .operation-button {
+    width: 85px;
+    height: 85px;
+  }
+  
+  .operation-icon {
+    font-size: 1.8rem;
+  }
+} 
