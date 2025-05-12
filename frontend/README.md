@@ -183,7 +183,3 @@ Puedes personalizar la aplicación modificando:
 - Los estilos CSS en los archivos de la carpeta `/src/styles/`
 - Las explicaciones generadas en `NumberSelector.jsx`
 - Las visualizaciones en `OperationResult.jsx`
-
-## Licencia
-
-[MIT](LICENSE) 
