@@ -14,6 +14,8 @@ const LearningSteps = ({ operation }) => {
   const [practiceNumbers, setPracticeNumbers] = useState({ first: null, second: null });
   const [showVideo, setShowVideo] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
+  const [isReturningToVisualization, setIsReturningToVisualization] = useState(false);
+  const [showResult, setShowResult] = useState(true);
 
   useEffect(() => {
     if (currentStep === 2) {
@@ -21,8 +23,18 @@ const LearningSteps = ({ operation }) => {
     }
   }, [currentStep]);
 
+  // Efecto para manejar el audio del video
+  useEffect(() => {
+    if (showVideo) {
+      const mensaje = '¡Tu asistente virtual te mostrará un video para ayudarte a entender mejor! ¡Préstale mucha atención!';
+      speak(mensaje);
+    }
+  }, [showVideo]);
+
   const handleCalculate = (result) => {
     setOperationResult(result);
+    setIsReturningToVisualization(false);
+    setShowResult(true);
   };
 
   const generatePracticeQuestion = () => {
@@ -151,10 +163,11 @@ const LearningSteps = ({ operation }) => {
           speak(mensaje);
         } else {
           // Mostrar video después del segundo intento fallido
-          const mensaje = '¡No te preocupes! Vamos a ver un video divertido que te ayudará a entender mejor. ¡Préstale mucha atención!';
+          const mensaje = '¡No te preocupes! Tu asistente virtual te ayudará con un video que te explicará mejor. ¡Préstale mucha atención!';
           console.log("Reproduciendo mensaje de video:", mensaje);
           findHelpVideo();
           setShowVideo(true);
+          speak(mensaje);
         }
       }, 500);
     }
@@ -165,6 +178,7 @@ const LearningSteps = ({ operation }) => {
     setUserAnswer('');
     setIsCorrect(null);
     setAttempts(0);
+    setIsReturningToVisualization(false);
     
     // Esperar a que se actualice el estado antes de hablar
     setTimeout(() => {
@@ -179,6 +193,7 @@ const LearningSteps = ({ operation }) => {
   const resetStep = () => {
     setUserAnswer('');
     setIsCorrect(null);
+    setIsReturningToVisualization(false);
     
     // Primero generar nueva pregunta
     generatePracticeQuestion();
@@ -188,7 +203,7 @@ const LearningSteps = ({ operation }) => {
       const mensaje = '¡Vamos con otro ejercicio! ¡Tú puedes resolverlo!';
       console.log("Reproduciendo mensaje de reinicio:", mensaje);
       speak(mensaje);
-    }, 500); // Esperar más tiempo para no superponerse con el mensaje de la nueva pregunta
+    }, 500);
   };
 
   const findHelpVideo = () => {
@@ -277,6 +292,23 @@ const LearningSteps = ({ operation }) => {
     );
   };
 
+  const returnToVisualization = () => {
+    stopSpeaking(); // Detener cualquier audio en reproducción
+    setIsReturningToVisualization(true);
+    setCurrentStep(1);
+    setShowResult(false);
+    setOperationResult(null); // Limpiar completamente el resultado
+    setIsCorrect(null); // Resetear el estado de corrección
+    setUserAnswer(''); // Limpiar la respuesta del usuario
+    setAttempts(0); // Resetear los intentos
+    setShowVideo(false); // Ocultar el video si estaba visible
+    
+    // Dar tiempo para que se limpie todo antes de permitir nueva visualización
+    setTimeout(() => {
+      setIsReturningToVisualization(false);
+    }, 500);
+  };
+
   return (
     <div className="learning-steps-container">
       <div className="step-indicator">
@@ -289,13 +321,17 @@ const LearningSteps = ({ operation }) => {
         <div className="step-content">
           <NumberSelector 
             operation={operation} 
-            onCalculate={handleCalculate} 
+            onCalculate={handleCalculate}
+            isReturningToVisualization={isReturningToVisualization}
           />
           
-          {operationResult && (
+          {operationResult && showResult && (
             <>
               <div className="result-area">
-                <OperationResult result={operationResult} />
+                <OperationResult 
+                  result={operationResult}
+                  isReturningToVisualization={isReturningToVisualization}
+                />
               </div>
               <button 
                 className="next-step-button" 
@@ -434,7 +470,7 @@ const LearningSteps = ({ operation }) => {
           <div className="practice-navigation">
             <button 
               className="back-button"
-              onClick={() => setCurrentStep(1)}
+              onClick={returnToVisualization}
               style={{ borderColor: operation.color, color: operation.color }}
             >
               ⬅️ Volver a Visualización

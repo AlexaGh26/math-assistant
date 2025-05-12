@@ -3,7 +3,7 @@ import { speak, stopSpeaking, isSpeaking } from '../../services/speechService';
 import { playSound, setAudioEnabled, isAudioEnabled, SOUNDS } from '../../services/audioService';
 import './styles.css';
 
-const OperationResult = ({ result }) => {
+const OperationResult = ({ result, isReturningToVisualization }) => {
   const canvasRef = useRef(null);
   
   if (!result || !result.operation) {
@@ -21,6 +21,19 @@ const OperationResult = ({ result }) => {
   const animationStartTimeRef = useRef(null);
   const prevResultRef = useRef(null);
   const soundTimeoutsRef = useRef([]);
+  const hasSpokenRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      soundTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+      soundTimeoutsRef.current = [];
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      stopSpeaking();
+      hasSpokenRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const checkSpeaking = () => {
@@ -43,23 +56,37 @@ const OperationResult = ({ result }) => {
   }, [audioEnabled]);
 
   useEffect(() => {
-    return () => {
-      soundTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
-      soundTimeoutsRef.current = [];
-    };
-  }, []);
+    // Solo ejecutar cuando explanation cambie y no sea null
+    if (explanation && !isReturningToVisualization && !hasSpokenRef.current) {
+      hasSpokenRef.current = true;
+      speak(explanation);
+      setIsSpeakingNow(true);
+    }
 
-  useEffect(() => {
-    if (explanation) {
-      setTimeout(() => {
-        speak(explanation);
-        setIsSpeakingNow(true);
-      }, 100);
+    if (!explanation) {
+      hasSpokenRef.current = false;
     }
   }, [explanation]);
 
+  // Efecto para resetear hasSpokenRef cuando cambian los números
+  useEffect(() => {
+    hasSpokenRef.current = false;
+  }, [firstNumber, secondNumber]);
+
+  useEffect(() => {
+    if (isReturningToVisualization) {
+      stopSpeaking();
+      soundTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+      soundTimeoutsRef.current = [];
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      hasSpokenRef.current = false;
+    }
+  }, [isReturningToVisualization]);
+
   const scheduleSound = (soundName, delayMs, volume = 1.0, rate = 1.0) => {
-    if (!audioEnabled) return;
+    if (!audioEnabled || isReturningToVisualization) return;
     
     const timeout = setTimeout(() => {
       playSound(soundName, volume, rate);
